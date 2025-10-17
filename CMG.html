@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>清艳教育-陈梦鸽</title>
@@ -384,6 +386,7 @@
             background: rgba(0, 243, 255, 0.1);
             border: 1px solid var(--primary);
             font-size: 0.9rem;
+            margin-top: 10px;
         }
         
         .sync-status.success {
@@ -396,6 +399,46 @@
             background: rgba(255, 0, 200, 0.1);
             border-color: var(--secondary);
             color: var(--secondary);
+        }
+        
+        .sync-status.info {
+            background: rgba(0, 243, 255, 0.1);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        .template-download {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 243, 255, 0.05);
+            border-radius: 8px;
+            border: 1px dashed rgba(0, 243, 255, 0.3);
+        }
+        
+        .template-download h4 {
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+        
+        .template-download p {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 10px;
         }
         
         /* 响应式设计 */
@@ -486,16 +529,30 @@
                         <i>➕</i> 添加班级
                     </button>
                     <div class="data-management">
-                        <button id="exportBtn" class="btn btn-secondary">
-                            <i>💾</i> 导出数据
+                        <button id="exportExcelBtn" class="btn btn-secondary">
+                            <i>📊</i> 导出Excel
                         </button>
-                        <button id="importBtn" class="btn btn-secondary">
-                            <i>📥</i> 导入数据
+                        <div class="file-input-wrapper">
+                            <button class="btn btn-secondary">
+                                <i>📥</i> 导入Excel
+                            </button>
+                            <input type="file" id="importExcelFile" accept=".xlsx,.xls">
+                        </div>
+                        <button id="syncToCloud" class="btn btn-secondary">
+                            <i>☁️</i> 手动同步
                         </button>
-                        <input type="file" id="importFile" accept=".json" style="display: none;">
                     </div>
-                    <div id="syncStatus" class="sync-status" style="display: none;">
-                        数据状态显示
+                    
+                    <div class="template-download">
+                        <h4>📋 Excel模板说明</h4>
+                        <p>请使用以下格式的Excel文件：第一列为班级名称，第二列开始为学生姓名</p>
+                        <button id="downloadTemplate" class="btn btn-sm btn-secondary">
+                            <i>📄</i> 下载模板
+                        </button>
+                    </div>
+                    
+                    <div id="syncStatus" class="sync-status">
+                        正在初始化云端连接...
                     </div>
                 </div>
                 
@@ -572,9 +629,6 @@
                             <div class="voice-toggle" id="voiceToggle">
                                 <i>🔊</i> 语音播报: <span id="voiceStatus">开启</span>
                             </div>
-<!--                            <div class="voice-toggle" id="astronautToggle">-->
-<!--                                <i>👨‍🚀</i> 宇航员音效: <span id="astronautStatus">开启</span>-->
-<!--                            </div>-->
                         </div>
                         
                         <button id="randomBtn" class="btn random-btn">
@@ -587,17 +641,17 @@
     </div>
 
     <script>
-        // 配置 - 部署时需要修改这些信息
-        const GITHUB_USERNAME = 'wosyingx';  // 替换为你的GitHub用户名
-        const GITHUB_REPO = 'CMG';     // 替换为你的仓库名
-        const GITHUB_BRANCH = 'main';             // 替换为你的分支名，通常是main或master
+        // Supabase配置
+        const SUPABASE_URL = 'https://tjyygbrlyzsqqtormjrn.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqeXlnYnJseXpzcXF0b3JtanJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA3MDg2MjgsImV4cCI6MjA3NjI4NDYyOH0.YEBffdkQ9hDiQUTh3fpJHDPC5CT8fENHX1J7ZqMU4m4';
         
-        const DATA_FILE_URL = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${GITHUB_REPO}/${GITHUB_BRANCH}/class-data.json`;
+        // 初始化Supabase客户端
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         
         // 初始化数据
         let classes = [];
         let voiceEnabled = true;
-        let astronautVoiceEnabled = true;
+        let isOnline = false;
         
         // DOM元素
         const classNameInput = document.getElementById('className');
@@ -613,153 +667,401 @@
         const classCount = document.getElementById('class-count');
         const studentCount = document.getElementById('student-count');
         const voiceToggle = document.getElementById('voiceToggle');
-        const astronautToggle = document.getElementById('astronautToggle');
         const voiceStatus = document.getElementById('voiceStatus');
-        const astronautStatus = document.getElementById('astronautStatus');
-        const exportBtn = document.getElementById('exportBtn');
-        const importBtn = document.getElementById('importBtn');
-        const importFile = document.getElementById('importFile');
+        const exportExcelBtn = document.getElementById('exportExcelBtn');
+        const importExcelFile = document.getElementById('importExcelFile');
+        const syncToCloud = document.getElementById('syncToCloud');
         const syncStatus = document.getElementById('syncStatus');
+        const downloadTemplate = document.getElementById('downloadTemplate');
         
         // 页面导航
         const navLinks = document.querySelectorAll('.nav-link');
         const pages = document.querySelectorAll('.page');
-        
-        // 从GitHub加载数据
-        async function loadDataFromGitHub() {
-            try {
-                console.log('正在从GitHub加载数据...');
-                showSyncStatus('正在从GitHub加载数据...', 'loading');
-                
-                // 添加时间戳避免缓存
-                const response = await fetch(`${DATA_FILE_URL}?t=${Date.now()}`);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('从GitHub加载数据成功', data);
-                    showSyncStatus('数据加载成功', 'success');
-                    return data;
-                } else {
-                    console.log('GitHub数据文件不存在，使用本地数据');
-                    showSyncStatus('使用本地数据', 'info');
-                }
-            } catch (error) {
-                console.log('从GitHub加载数据失败，使用本地数据', error);
-                showSyncStatus('GitHub加载失败，使用本地数据', 'error');
-            }
-            
-            // 回退到本地存储
-            const localData = localStorage.getItem('classes');
-            return localData ? JSON.parse(localData) : [];
-        }
         
         // 显示同步状态
         function showSyncStatus(message, type = 'info') {
             syncStatus.textContent = message;
             syncStatus.className = `sync-status ${type}`;
             syncStatus.style.display = 'block';
+        }
+        
+        // 检查Supabase连接
+        async function checkSupabaseConnection() {
+            try {
+                const { data, error } = await supabase
+                    .from('class_data')
+                    .select('id')
+                    .limit(1);
+                
+                if (error) throw error;
+                isOnline = true;
+                showSyncStatus('✅ 已连接到云端存储，数据实时同步', 'success');
+                return true;
+            } catch (error) {
+                console.log('Supabase连接失败:', error);
+                isOnline = false;
+                showSyncStatus('❌ 离线模式 - 使用本地数据', 'error');
+                return false;
+            }
+        }
+        
+        // 从Supabase加载数据
+        async function loadDataFromSupabase() {
+            try {
+                const { data, error } = await supabase
+                    .from('class_data')
+                    .select('data')
+                    .eq('id', 1)
+                    .single();
+                
+                if (error) throw error;
+                
+                if (data && data.data) {
+                    classes = data.data;
+                    saveDataToLocal();
+                    showSyncStatus('✅ 数据已从云端加载', 'success');
+                    return true;
+                } else {
+                    // 如果没有数据，创建初始数据
+                    await createInitialData();
+                    return true;
+                }
+            } catch (error) {
+                console.log('从Supabase加载数据失败:', error);
+                return false;
+            }
+        }
+        
+        // 创建初始数据
+        async function createInitialData() {
+            try {
+                const { error } = await supabase
+                    .from('class_data')
+                    .insert({
+                        id: 1,
+                        data: [],
+                        updated_at: new Date().toISOString()
+                    });
+                
+                if (error) throw error;
+                console.log('初始数据创建成功');
+                return true;
+            } catch (error) {
+                console.log('创建初始数据失败:', error);
+                return false;
+            }
+        }
+        
+        // 保存数据到Supabase
+        async function saveDataToSupabase() {
+            if (!isOnline) return false;
             
-            // 3秒后隐藏
-            setTimeout(() => {
-                syncStatus.style.display = 'none';
-            }, 3000);
+            try {
+                const { error } = await supabase
+                    .from('class_data')
+                    .upsert({
+                        id: 1,
+                        data: classes,
+                        updated_at: new Date().toISOString()
+                    });
+                
+                if (error) throw error;
+                
+                showSyncStatus('✅ 数据已同步到云端', 'success');
+                return true;
+            } catch (error) {
+                console.log('保存到Supabase失败:', error);
+                showSyncStatus('❌ 云端同步失败', 'error');
+                return false;
+            }
         }
         
         // 保存数据到本地存储
         function saveDataToLocal() {
-            localStorage.setItem('classes', JSON.stringify(classes));
-            showSyncStatus('数据已保存到本地', 'success');
+            try {
+                localStorage.setItem('classes', JSON.stringify(classes));
+                localStorage.setItem('lastSaveTime', Date.now().toString());
+            } catch (error) {
+                console.error('本地保存失败:', error);
+            }
         }
         
-        // 导出数据
-        function exportData() {
-            const dataStr = JSON.stringify(classes, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'class-data.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            showSyncStatus('数据已导出，请手动上传到GitHub', 'success');
+        // 从本地存储加载数据
+        function loadDataFromLocal() {
+            try {
+                const localData = localStorage.getItem('classes');
+                if (localData) {
+                    classes = JSON.parse(localData);
+                    return true;
+                }
+            } catch (error) {
+                console.error('从本地存储加载数据失败:', error);
+            }
+            classes = [];
+            return false;
         }
         
-        // 导入数据
-        function importData(event) {
+        // 保存数据（同时保存到本地和云端）
+        async function saveData() {
+            // 先保存到本地
+            saveDataToLocal();
+            
+            // 尝试保存到云端
+            if (isOnline) {
+                await saveDataToSupabase();
+            }
+        }
+        
+        // 导出为Excel文件
+        function exportToExcel() {
+            try {
+                // 创建工作簿
+                const wb = XLSX.utils.book_new();
+                
+                // 为每个班级创建一个工作表
+                classes.forEach((cls, index) => {
+                    // 准备数据：第一行是标题，后面是学生名单
+                    const data = [
+                        ['班级', cls.name], // 第一行：班级名称
+                        ['学生名单'],        // 第二行：标题
+                        ...cls.students.map(student => [student]) // 后续行：学生姓名
+                    ];
+                    
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+                    
+                    // 设置列宽
+                    const colWidth = [{ wch: 20 }]; // 列宽20个字符
+                    ws['!cols'] = colWidth;
+                    
+                    // 添加工作表到工作簿
+                    XLSX.utils.book_append_sheet(wb, ws, `班级${index + 1}`);
+                });
+                
+                // 如果没有班级，创建一个空的工作表
+                if (classes.length === 0) {
+                    const ws = XLSX.utils.aoa_to_sheet([['暂无班级数据']]);
+                    XLSX.utils.book_append_sheet(wb, ws, '空数据');
+                }
+                
+                // 生成Excel文件并下载
+                const fileName = `班级数据_${new Date().toISOString().split('T')[0]}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+                
+                showSyncStatus('✅ Excel文件导出成功', 'success');
+            } catch (error) {
+                console.error('导出Excel失败:', error);
+                showSyncStatus('❌ Excel导出失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 从Excel导入数据
+        function importFromExcel(event) {
             const file = event.target.files[0];
-            if (!file) return;
+            if (!file) {
+                showSyncStatus('❌ 未选择文件', 'error');
+                return;
+            }
+            
+            if (!file.name.match(/\.(xlsx|xls)$/)) {
+                showSyncStatus('❌ 请选择Excel文件(.xlsx或.xls)', 'error');
+                return;
+            }
             
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 try {
-                    const importedData = JSON.parse(e.target.result);
-                    classes = importedData;
-                    saveDataToLocal();
-                    renderClassList();
-                    updateClassSelects();
-                    updateStats();
-                    renderStudentList();
-                    showSyncStatus('数据导入成功', 'success');
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    const importedClasses = [];
+                    
+                    // 遍历所有工作表
+                    workbook.SheetNames.forEach(sheetName => {
+                        const worksheet = workbook.Sheets[sheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        
+                        // 查找班级名称和学生名单
+                        let className = '';
+                        const students = [];
+                        
+                        for (let i = 0; i < jsonData.length; i++) {
+                            const row = jsonData[i];
+                            if (row.length > 0) {
+                                // 查找包含"班级"的行
+                                if (row[0] && row[0].toString().includes('班级')) {
+                                    className = row[1] || row[0].replace('班级', '').trim();
+                                }
+                                // 查找学生名单
+                                else if (row[0] && (row[0].toString().includes('学生') || i > 1)) {
+                                    if (row[0] && !row[0].toString().includes('学生名单') && row[0].toString().trim()) {
+                                        students.push(row[0].toString().trim());
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // 如果没有找到班级名称，使用工作表名
+                        if (!className) {
+                            className = sheetName;
+                        }
+                        
+                        // 清理班级名称
+                        className = className.replace('班级', '').trim();
+                        
+                        if (className && className !== '空数据') {
+                            importedClasses.push({
+                                name: className,
+                                students: students.filter(s => s) // 过滤空值
+                            });
+                        }
+                    });
+                    
+                    if (importedClasses.length === 0) {
+                        throw new Error('未找到有效的班级数据');
+                    }
+                    
+                    if (confirm(`确定要导入数据吗？这将覆盖当前的所有数据。\n找到 ${importedClasses.length} 个班级，共 ${importedClasses.reduce((sum, cls) => sum + cls.students.length, 0)} 名学生`)) {
+                        classes = importedClasses;
+                        await saveData();
+                        updateUI();
+                        showSyncStatus(`✅ Excel导入成功！共 ${importedClasses.length} 个班级`, 'success');
+                    }
                 } catch (error) {
-                    showSyncStatus('数据导入失败：文件格式错误', 'error');
+                    console.error('导入Excel失败:', error);
+                    showSyncStatus('❌ Excel导入失败: ' + error.message, 'error');
                 }
             };
-            reader.readAsText(file);
             
-            // 重置文件输入
+            reader.onerror = function() {
+                showSyncStatus('❌ 文件读取失败', 'error');
+            };
+            
+            reader.readAsArrayBuffer(file);
             event.target.value = '';
+        }
+        
+        // 下载Excel模板
+        function downloadExcelTemplate() {
+            try {
+                const wb = XLSX.utils.book_new();
+                
+                // 创建示例数据
+                const exampleData = [
+                    ['班级', '三年级一班'],
+                    ['学生名单'],
+                    ['张三'],
+                    ['李四'],
+                    ['王五'],
+                    ['赵六']
+                ];
+                
+                const ws = XLSX.utils.aoa_to_sheet(exampleData);
+                
+                // 设置列宽
+                const colWidth = [{ wch: 20 }];
+                ws['!cols'] = colWidth;
+                
+                XLSX.utils.book_append_sheet(wb, ws, '示例模板');
+                
+                // 添加说明工作表
+                const instructionData = [
+                    ['Excel导入说明'],
+                    [],
+                    ['格式要求：'],
+                    ['1. 第一列A列为班级名称和学生名单'],
+                    ['2. 第一行：填写"班级"和具体的班级名称'],
+                    ['3. 第二行：填写"学生名单"作为标题'],
+                    ['4. 第三行开始：每行一个学生姓名'],
+                    [],
+                    ['注意事项：'],
+                    ['- 支持多个工作表，每个工作表对应一个班级'],
+                    ['- 班级名称会自动从工作表名或内容中提取'],
+                    ['- 空行会被自动忽略']
+                ];
+                
+                const ws2 = XLSX.utils.aoa_to_sheet(instructionData);
+                ws2['!cols'] = [{ wch: 40 }];
+                XLSX.utils.book_append_sheet(wb, ws2, '使用说明');
+                
+                XLSX.writeFile(wb, '班级数据导入模板.xlsx');
+                showSyncStatus('✅ 模板下载成功', 'success');
+            } catch (error) {
+                console.error('下载模板失败:', error);
+                showSyncStatus('❌ 模板下载失败', 'error');
+            }
+        }
+        
+        // 更新所有UI组件
+        function updateUI() {
+            renderClassList();
+            updateClassSelects();
+            updateStats();
+            renderStudentList();
         }
         
         // 初始化页面
         async function initPage() {
-            // 加载数据
-            classes = await loadDataFromGitHub();
+            // 检查Supabase连接
+            await checkSupabaseConnection();
             
-            renderClassList();
-            updateClassSelects();
-            updateStats();
+            // 尝试从云端加载数据
+            const cloudSuccess = await loadDataFromSupabase();
             
-            // 设置页面导航
+            // 如果云端加载失败，使用本地数据
+            if (!cloudSuccess) {
+                const localSuccess = loadDataFromLocal();
+                if (localSuccess) {
+                    showSyncStatus('ℹ️ 使用本地数据', 'info');
+                } else {
+                    showSyncStatus('ℹ️ 使用空数据', 'info');
+                }
+            }
+            
+            updateUI();
+            setupEventListeners();
+        }
+        
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 数据管理事件
+            exportExcelBtn.addEventListener('click', exportToExcel);
+            importExcelFile.addEventListener('change', importFromExcel);
+            syncToCloud.addEventListener('click', async () => {
+                if (await saveDataToSupabase()) {
+                    showSyncStatus('✅ 手动同步成功', 'success');
+                }
+            });
+            downloadTemplate.addEventListener('click', downloadExcelTemplate);
+            
+            // 其他事件监听器
+            addClassBtn.addEventListener('click', addClass);
+            addStudentBtn.addEventListener('click', addStudent);
+            classSelect.addEventListener('change', renderStudentList);
+            randomBtn.addEventListener('click', randomSelect);
+            
+            // 页面导航
             navLinks.forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.preventDefault();
                     const pageId = this.getAttribute('data-page');
                     
-                    // 更新活动链接
                     navLinks.forEach(l => l.classList.remove('active'));
                     this.classList.add('active');
                     
-                    // 显示对应页面
                     pages.forEach(page => page.classList.remove('active'));
                     document.getElementById(`${pageId}-page`).classList.add('active');
                 });
             });
             
-            // 语音控制事件
+            // 语音控制
             voiceToggle.addEventListener('click', function() {
                 voiceEnabled = !voiceEnabled;
                 voiceStatus.textContent = voiceEnabled ? '开启' : '关闭';
                 voiceToggle.classList.toggle('active', voiceEnabled);
             });
             
-            astronautToggle.addEventListener('click', function() {
-                astronautVoiceEnabled = !astronautVoiceEnabled;
-                astronautStatus.textContent = astronautVoiceEnabled ? '开启' : '关闭';
-                astronautToggle.classList.toggle('active', astronautVoiceEnabled);
-            });
-            
-            // 数据管理事件
-            exportBtn.addEventListener('click', exportData);
-            importBtn.addEventListener('click', () => importFile.click());
-            importFile.addEventListener('change', importData);
-            
             // 初始化语音控制状态
             voiceToggle.classList.add('active');
-            astronautToggle.classList.add('active');
         }
         
         // 更新统计信息
@@ -820,7 +1122,7 @@
         }
         
         // 添加班级
-        function addClass() {
+        async function addClass() {
             const className = classNameInput.value.trim();
             
             if (!className) {
@@ -833,35 +1135,28 @@
                 students: []
             });
             
-            saveDataToLocal();
+            await saveData();
             classNameInput.value = '';
-            renderClassList();
-            updateClassSelects();
-            updateStats();
+            updateUI();
         }
         
         // 编辑班级
-        function editClass(index) {
+        async function editClass(index) {
             const newName = prompt('请输入新的班级名称', classes[index].name);
             
             if (newName && newName.trim()) {
                 classes[index].name = newName.trim();
-                saveDataToLocal();
-                renderClassList();
-                updateClassSelects();
-                updateStats();
+                await saveData();
+                updateUI();
             }
         }
         
         // 删除班级
-        function deleteClass(index) {
+        async function deleteClass(index) {
             if (confirm(`确定要删除班级 "${classes[index].name}" 吗？`)) {
                 classes.splice(index, 1);
-                saveDataToLocal();
-                renderClassList();
-                updateClassSelects();
-                renderStudentList();
-                updateStats();
+                await saveData();
+                updateUI();
             }
         }
         
@@ -897,7 +1192,7 @@
         }
         
         // 添加学生
-        function addStudent() {
+        async function addStudent() {
             const selectedClassIndex = classSelect.value;
             const studentName = studentNameInput.value.trim();
             
@@ -912,19 +1207,17 @@
             }
             
             classes[selectedClassIndex].students.push(studentName);
-            saveDataToLocal();
+            await saveData();
             studentNameInput.value = '';
-            renderStudentList();
-            updateStats();
+            updateUI();
         }
         
         // 删除学生
-        function deleteStudent(classIndex, studentIndex) {
+        async function deleteStudent(classIndex, studentIndex) {
             if (confirm(`确定要删除学生 "${classes[classIndex].students[studentIndex]}" 吗？`)) {
                 classes[classIndex].students.splice(studentIndex, 1);
-                saveDataToLocal();
-                renderStudentList();
-                updateStats();
+                await saveData();
+                updateUI();
             }
         }
         
@@ -932,33 +1225,18 @@
         function speakText(text) {
             if (!voiceEnabled) return;
             
-            // 检查浏览器是否支持语音合成
             if (!('speechSynthesis' in window)) {
                 console.log('抱歉，您的浏览器不支持语音合成功能');
                 return;
             }
             
-            // 创建语音合成实例
             const utterance = new SpeechSynthesisUtterance(text);
-            
-            // 设置语音参数
             utterance.lang = 'zh-CN';
-            utterance.rate = 0.8; // 语速
+            utterance.rate = 0.8;
+            utterance.pitch = 0.9;
+            utterance.volume = 1;
             
-            if (astronautVoiceEnabled) {
-                // 模拟宇航员音效 - 通过调整音调和音量
-                utterance.pitch = 0.7; // 降低音调
-                utterance.volume = 0.9; // 稍微降低音量
-                utterance.rate = 0.7; // 更慢的语速
-                
-                // 添加宇航员特有的语音效果
-                setTimeout(() => {
-                    window.speechSynthesis.speak(utterance);
-                }, 100);
-            } else {
-                // 普通语音
-                window.speechSynthesis.speak(utterance);
-            }
+            window.speechSynthesis.speak(utterance);
         }
         
         // 随机点名
@@ -977,10 +1255,8 @@
                 return;
             }
             
-            // 添加动画效果
             studentDisplay.classList.add('pulse');
             
-            // 随机选择动画
             let counter = 0;
             const interval = setInterval(() => {
                 const randomIndex = Math.floor(Math.random() * students.length);
@@ -991,15 +1267,12 @@
                     clearInterval(interval);
                     studentDisplay.classList.remove('pulse');
                     
-                    // 最终选择
                     const finalIndex = Math.floor(Math.random() * students.length);
                     const selectedStudent = students[finalIndex];
                     studentDisplay.textContent = selectedStudent;
                     
-                    // 语音播报被选中的学生
                     speakText(selectedStudent);
                     
-                    // 添加选中效果
                     studentDisplay.style.background = 'rgba(0, 255, 157, 0.1)';
                     studentDisplay.style.borderColor = 'var(--accent)';
                     setTimeout(() => {
@@ -1018,6 +1291,11 @@
         
         // 初始化页面
         initPage();
+        
+        // 全局函数，供HTML中的onclick调用
+        window.editClass = editClass;
+        window.deleteClass = deleteClass;
+        window.deleteStudent = deleteStudent;
     </script>
 </body>
 </html>
