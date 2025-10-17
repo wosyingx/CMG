@@ -462,6 +462,59 @@
             width: auto;
         }
         
+        /* 导出选项 */
+        .export-options {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 243, 255, 0.05);
+            border-radius: 8px;
+            border: 1px dashed rgba(0, 243, 255, 0.3);
+        }
+
+        .export-options h4 {
+            color: var(--accent);
+            margin-bottom: 8px;
+        }
+
+        .class-selection {
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(5, 10, 20, 0.6);
+            border-radius: 8px;
+            border: 1px solid rgba(0, 243, 255, 0.2);
+        }
+
+        .class-selection-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+        .class-selection-item:hover {
+            background: rgba(0, 243, 255, 0.1);
+        }
+
+        .class-selection-item input[type="checkbox"] {
+            width: auto;
+        }
+
+        .selection-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .selection-actions .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.8rem;
+        }
+        
         /* 响应式设计 */
         @media (max-width: 768px) {
             .app-container {
@@ -564,6 +617,26 @@
                         </button>
                     </div>
                     
+                    <!-- 导出选项 -->
+                    <div class="export-options">
+                        <h4>📋 导出选项</h4>
+                        <div class="class-selection" id="classSelection">
+                            <!-- 班级选择列表将在这里动态生成 -->
+                        </div>
+                        <div class="selection-actions">
+                            <button id="selectAllBtn" class="btn btn-sm btn-secondary">
+                                <i>✅</i> 全选
+                            </button>
+                            <button id="deselectAllBtn" class="btn btn-sm btn-secondary">
+                                <i>❌</i> 全不选
+                            </button>
+                            <button id="exportSelectedBtn" class="btn btn-sm">
+                                <i>📤</i> 导出选中班级
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 导入选项 -->
                     <div class="import-options">
                         <h4>📋 导入选项</h4>
                         <label>
@@ -707,6 +780,10 @@
         const syncToCloud = document.getElementById('syncToCloud');
         const syncStatus = document.getElementById('syncStatus');
         const downloadTemplate = document.getElementById('downloadTemplate');
+        const classSelection = document.getElementById('classSelection');
+        const selectAllBtn = document.getElementById('selectAllBtn');
+        const deselectAllBtn = document.getElementById('deselectAllBtn');
+        const exportSelectedBtn = document.getElementById('exportSelectedBtn');
         
         // 页面导航
         const navLinks = document.querySelectorAll('.nav-link');
@@ -846,8 +923,90 @@
             }
         }
         
-        // 导出为Excel文件
-        function exportToExcel() {
+        // 渲染班级选择列表
+        function renderClassSelection() {
+            classSelection.innerHTML = '';
+            
+            if (classes.length === 0) {
+                classSelection.innerHTML = '<div class="empty-message">暂无班级数据</div>';
+                return;
+            }
+            
+            classes.forEach((cls, index) => {
+                const selectionItem = document.createElement('div');
+                selectionItem.className = 'class-selection-item';
+                selectionItem.innerHTML = `
+                    <input type="checkbox" id="class-${index}" value="${index}" checked>
+                    <label for="class-${index}" style="margin: 0; cursor: pointer;">
+                        ${cls.name} (${cls.students.length}名学生)
+                    </label>
+                `;
+                classSelection.appendChild(selectionItem);
+            });
+        }
+        
+        // 获取选中的班级索引
+        function getSelectedClassIndexes() {
+            const checkboxes = classSelection.querySelectorAll('input[type="checkbox"]:checked');
+            return Array.from(checkboxes).map(cb => parseInt(cb.value));
+        }
+        
+        // 导出选中的班级为Excel文件
+        function exportSelectedToExcel() {
+            try {
+                const selectedIndexes = getSelectedClassIndexes();
+                
+                if (selectedIndexes.length === 0) {
+                    showSyncStatus('❌ 请至少选择一个班级', 'error');
+                    return;
+                }
+                
+                // 创建工作簿
+                const wb = XLSX.utils.book_new();
+                
+                // 为每个选中的班级创建一个工作表
+                selectedIndexes.forEach((classIndex, sheetIndex) => {
+                    const cls = classes[classIndex];
+                    
+                    // 准备数据：第一行是标题，后面是学生名单
+                    const data = [
+                        ['班级', cls.name], // 第一行：班级名称
+                        ['学生名单'],        // 第二行：标题
+                        ...cls.students.map(student => [student]) // 后续行：学生姓名
+                    ];
+                    
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+                    
+                    // 设置列宽
+                    const colWidth = [{ wch: 20 }]; // 列宽20个字符
+                    ws['!cols'] = colWidth;
+                    
+                    // 添加工作表到工作簿，使用班级名称作为工作表名（限制在31个字符内）
+                    let sheetName = cls.name.substring(0, 31);
+                    // 确保工作表名不重复
+                    let finalSheetName = sheetName;
+                    let counter = 1;
+                    while (wb.SheetNames.includes(finalSheetName)) {
+                        finalSheetName = `${sheetName.substring(0, 28)}_${counter}`;
+                        counter++;
+                    }
+                    
+                    XLSX.utils.book_append_sheet(wb, ws, finalSheetName);
+                });
+                
+                // 生成Excel文件并下载
+                const fileName = `选中班级数据_${new Date().toISOString().split('T')[0]}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+                
+                showSyncStatus(`✅ 成功导出 ${selectedIndexes.length} 个班级`, 'success');
+            } catch (error) {
+                console.error('导出Excel失败:', error);
+                showSyncStatus('❌ Excel导出失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 导出所有班级为Excel文件
+        function exportAllToExcel() {
             try {
                 // 创建工作簿
                 const wb = XLSX.utils.book_new();
@@ -867,8 +1026,17 @@
                     const colWidth = [{ wch: 20 }]; // 列宽20个字符
                     ws['!cols'] = colWidth;
                     
-                    // 添加工作表到工作簿
-                    XLSX.utils.book_append_sheet(wb, ws, `班级${index + 1}`);
+                    // 添加工作表到工作簿，使用班级名称作为工作表名（限制在31个字符内）
+                    let sheetName = cls.name.substring(0, 31);
+                    // 确保工作表名不重复
+                    let finalSheetName = sheetName;
+                    let counter = 1;
+                    while (wb.SheetNames.includes(finalSheetName)) {
+                        finalSheetName = `${sheetName.substring(0, 28)}_${counter}`;
+                        counter++;
+                    }
+                    
+                    XLSX.utils.book_append_sheet(wb, ws, finalSheetName);
                 });
                 
                 // 如果没有班级，创建一个空的工作表
@@ -878,10 +1046,10 @@
                 }
                 
                 // 生成Excel文件并下载
-                const fileName = `班级数据_${new Date().toISOString().split('T')[0]}.xlsx`;
+                const fileName = `所有班级数据_${new Date().toISOString().split('T')[0]}.xlsx`;
                 XLSX.writeFile(wb, fileName);
                 
-                showSyncStatus('✅ Excel文件导出成功', 'success');
+                showSyncStatus('✅ 所有班级导出成功', 'success');
             } catch (error) {
                 console.error('导出Excel失败:', error);
                 showSyncStatus('❌ Excel导出失败: ' + error.message, 'error');
@@ -1072,6 +1240,7 @@
             renderClassList();
             updateClassSelects();
             updateStats();
+            renderClassSelection();
             // 只在学生管理页面更新学生列表
             if (document.getElementById('students-page').classList.contains('active')) {
                 renderStudentList();
@@ -1103,7 +1272,7 @@
         // 设置事件监听器
         function setupEventListeners() {
             // 数据管理事件
-            exportExcelBtn.addEventListener('click', exportToExcel);
+            exportExcelBtn.addEventListener('click', exportAllToExcel);
             importExcelFile.addEventListener('change', importFromExcel);
             syncToCloud.addEventListener('click', async () => {
                 if (await saveDataToSupabase()) {
@@ -1111,6 +1280,19 @@
                 }
             });
             downloadTemplate.addEventListener('click', downloadExcelTemplate);
+            
+            // 导出选择事件
+            selectAllBtn.addEventListener('click', () => {
+                const checkboxes = classSelection.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(cb => cb.checked = true);
+            });
+            
+            deselectAllBtn.addEventListener('click', () => {
+                const checkboxes = classSelection.querySelectorAll('input[type="checkbox"]');
+                checkboxes.forEach(cb => cb.checked = false);
+            });
+            
+            exportSelectedBtn.addEventListener('click', exportSelectedToExcel);
             
             // 其他事件监听器
             addClassBtn.addEventListener('click', addClass);
