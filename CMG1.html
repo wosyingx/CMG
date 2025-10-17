@@ -1,0 +1,1162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清艳教育-陈梦鸽</title>
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --secondary: #ff00c8;
+            --accent: #00ff9d;
+            --dark: #0a0a1a;
+            --darker: #050510;
+            --light: #e0f7ff;
+            --card-bg: rgba(15, 20, 40, 0.7);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--darker), var(--dark));
+            color: var(--light);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        /* 侧边导航栏 */
+        .sidebar {
+            width: 250px;
+            background: rgba(10, 15, 30, 0.8);
+            padding: 30px 20px;
+            border-right: 1px solid rgba(0, 243, 255, 0.2);
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(0, 243, 255, 0.2);
+        }
+        
+        .logo h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+        }
+        
+        .nav-links {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 15px 20px;
+            color: var(--light);
+            text-decoration: none;
+            border-radius: 10px;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .nav-link:hover {
+            background: rgba(0, 243, 255, 0.1);
+        }
+        
+        .nav-link.active {
+            background: rgba(0, 243, 255, 0.2);
+            color: var(--primary);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
+        }
+        
+        .nav-link i {
+            font-size: 1.2rem;
+        }
+        
+        /* 主内容区域 */
+        .main-content {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+        
+        .page {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .page-header {
+            margin-bottom: 30px;
+        }
+        
+        .page-title {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            color: var(--primary);
+        }
+        
+        .page-subtitle {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1.1rem;
+        }
+        
+        /* 卡片样式 */
+        .card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(0, 243, 255, 0.1);
+            transition: all 0.3s;
+        }
+        
+        .card:hover {
+            border-color: rgba(0, 243, 255, 0.3);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.1);
+        }
+        
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .card-title {
+            font-size: 1.4rem;
+            color: var(--primary);
+        }
+        
+        /* 表单样式 */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--accent);
+            font-weight: 500;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(5, 10, 20, 0.8);
+            border: 1px solid rgba(0, 243, 255, 0.3);
+            border-radius: 8px;
+            color: var(--light);
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+        }
+        
+        /* 按钮样式 */
+        .btn {
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            color: var(--darker);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 243, 255, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(0, 243, 255, 0.1);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        
+        .btn-danger {
+            background: rgba(255, 0, 200, 0.1);
+            color: var(--secondary);
+            border: 1px solid var(--secondary);
+        }
+        
+        .btn-sm {
+            padding: 8px 15px;
+            font-size: 0.9rem;
+        }
+        
+        /* 列表样式 */
+        .list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .list-item {
+            background: rgba(5, 10, 20, 0.6);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid var(--primary);
+            transition: all 0.3s;
+        }
+        
+        .list-item:hover {
+            background: rgba(5, 10, 20, 0.8);
+            transform: translateX(5px);
+        }
+        
+        .item-name {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .item-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .empty-message {
+            text-align: center;
+            padding: 30px;
+            color: rgba(255, 255, 255, 0.5);
+            font-style: italic;
+        }
+        
+        /* 随机点名区域 */
+        .random-container {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        
+        .class-selector {
+            max-width: 400px;
+            margin: 0 auto 30px;
+        }
+        
+        .student-display {
+            font-size: 4rem;
+            margin: 40px 0;
+            min-height: 180px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(5, 10, 20, 0.6);
+            border-radius: 20px;
+            border: 2px solid rgba(0, 243, 255, 0.3);
+            padding: 30px;
+            transition: all 0.5s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .student-display::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(0, 243, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: shine 3s infinite;
+        }
+        
+        @keyframes shine {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
+        
+        .random-btn {
+            font-size: 1.3rem;
+            padding: 18px 40px;
+            margin-top: 20px;
+        }
+        
+        /* 统计卡片 */
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(0, 243, 255, 0.1);
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+        
+        /* 语音设置区域 */
+        .voice-controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .voice-toggle {
+            background: rgba(0, 243, 255, 0.1);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .voice-toggle.active {
+            background: rgba(0, 243, 255, 0.3);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+        }
+        
+        .voice-toggle:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* 数据管理区域 */
+        .data-management {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .sync-status {
+            padding: 10px 15px;
+            border-radius: 8px;
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px solid var(--primary);
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+        
+        .sync-status.success {
+            background: rgba(0, 255, 157, 0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        
+        .sync-status.error {
+            background: rgba(255, 0, 200, 0.1);
+            border-color: var(--secondary);
+            color: var(--secondary);
+        }
+        
+        .sync-status.info {
+            background: rgba(0, 243, 255, 0.1);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .file-input-wrapper input[type="file"] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .app-container {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                padding: 20px;
+            }
+            
+            .nav-links {
+                flex-direction: row;
+                overflow-x: auto;
+            }
+            
+            .nav-link {
+                white-space: nowrap;
+            }
+            
+            .main-content {
+                padding: 20px;
+            }
+            
+            .student-display {
+                font-size: 2.5rem;
+                min-height: 140px;
+            }
+            
+            .voice-controls, .data-management {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边导航栏 -->
+        <div class="sidebar">
+            <div class="logo">
+                <h1>清艳教育-陈梦鸽🐦</h1>
+            </div>
+            <div class="nav-links">
+                <a href="#" class="nav-link active" data-page="classes">
+                    <i>📚</i> 班级管理
+                </a>
+                <a href="#" class="nav-link" data-page="students">
+                    <i>👨‍🎓</i> 学生管理
+                </a>
+                <a href="#" class="nav-link" data-page="random">
+                    <i>🎲</i> 随机点名
+                </a>
+            </div>
+        </div>
+        
+        <!-- 主内容区域 -->
+        <div class="main-content">
+            <!-- 班级管理页面 -->
+            <div class="page active" id="classes-page">
+                <div class="page-header">
+                    <h2 class="page-title">班级管理</h2>
+                    <p class="page-subtitle">添加、编辑和删除班级信息</p>
+                </div>
+                
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-label">班级数量</div>
+                        <div class="stat-value" id="class-count">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">学生总数</div>
+                        <div class="stat-value" id="student-count">0</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">添加新班级</h3>
+                    </div>
+                    <div class="form-group">
+                        <label for="className">班级名称</label>
+                        <input type="text" id="className" placeholder="输入班级名称">
+                    </div>
+                    <button id="addClassBtn" class="btn">
+                        <i>➕</i> 添加班级
+                    </button>
+                    <div class="data-management">
+                        <button id="exportBtn" class="btn btn-secondary">
+                            <i>💾</i> 导出备份
+                        </button>
+                        <div class="file-input-wrapper">
+                            <button class="btn btn-secondary">
+                                <i>📥</i> 导入备份
+                            </button>
+                            <input type="file" id="importFile" accept=".json">
+                        </div>
+                        <button id="syncToCloud" class="btn btn-secondary">
+                            <i>☁️</i> 手动同步
+                        </button>
+                    </div>
+                    <div id="syncStatus" class="sync-status">
+                        正在初始化云端连接...
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">班级列表</h3>
+                    </div>
+                    <div class="list" id="classList">
+                        <!-- 班级列表将在这里动态生成 -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 学生管理页面 -->
+            <div class="page" id="students-page">
+                <div class="page-header">
+                    <h2 class="page-title">学生管理</h2>
+                    <p class="page-subtitle">为班级添加和管理学生信息</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">添加新学生</h3>
+                    </div>
+                    <div class="form-group">
+                        <label for="classSelect">选择班级</label>
+                        <select id="classSelect">
+                            <option value="">-- 请选择班级 --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="studentName">学生姓名</label>
+                        <input type="text" id="studentName" placeholder="输入学生姓名">
+                    </div>
+                    <button id="addStudentBtn" class="btn">
+                        <i>➕</i> 添加学生
+                    </button>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">学生列表</h3>
+                    </div>
+                    <div class="list" id="studentList">
+                        <!-- 学生列表将在这里动态生成 -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 随机点名页面 -->
+            <div class="page" id="random-page">
+                <div class="page-header">
+                    <h2 class="page-title">随机点名</h2>
+                    <p class="page-subtitle">随机选择学生回答问题</p>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">点名设置</h3>
+                    </div>
+                    <div class="random-container">
+                        <div class="form-group class-selector">
+                            <label for="randomClassSelect">选择班级</label>
+                            <select id="randomClassSelect">
+                                <option value="">-- 请选择班级 --</option>
+                            </select>
+                        </div>
+                        
+                        <div class="student-display" id="studentDisplay">
+                            请选择班级开始点名
+                        </div>
+                        
+                        <div class="voice-controls">
+                            <div class="voice-toggle" id="voiceToggle">
+                                <i>🔊</i> 语音播报: <span id="voiceStatus">开启</span>
+                            </div>
+                        </div>
+                        
+                        <button id="randomBtn" class="btn random-btn">
+                            <i>🎯</i> 开始随机点名
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase配置
+        const SUPABASE_URL = 'https://tjyygbrlyzsqqtormjrn.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRqeXlnYnJseXpzcXF0b3JtanJuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA3MDg2MjgsImV4cCI6MjA3NjI4NDYyOH0.YEBffdkQ9hDiQUTh3fpJHDPC5CT8fENHX1J7ZqMU4m4';
+        
+        // 初始化Supabase客户端
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // 初始化数据
+        let classes = [];
+        let voiceEnabled = true;
+        let isOnline = false;
+        
+        // DOM元素
+        const classNameInput = document.getElementById('className');
+        const addClassBtn = document.getElementById('addClassBtn');
+        const classList = document.getElementById('classList');
+        const classSelect = document.getElementById('classSelect');
+        const studentNameInput = document.getElementById('studentName');
+        const addStudentBtn = document.getElementById('addStudentBtn');
+        const studentList = document.getElementById('studentList');
+        const randomClassSelect = document.getElementById('randomClassSelect');
+        const studentDisplay = document.getElementById('studentDisplay');
+        const randomBtn = document.getElementById('randomBtn');
+        const classCount = document.getElementById('class-count');
+        const studentCount = document.getElementById('student-count');
+        const voiceToggle = document.getElementById('voiceToggle');
+        const voiceStatus = document.getElementById('voiceStatus');
+        const exportBtn = document.getElementById('exportBtn');
+        const importFile = document.getElementById('importFile');
+        const syncToCloud = document.getElementById('syncToCloud');
+        const syncStatus = document.getElementById('syncStatus');
+        
+        // 页面导航
+        const navLinks = document.querySelectorAll('.nav-link');
+        const pages = document.querySelectorAll('.page');
+        
+        // 显示同步状态
+        function showSyncStatus(message, type = 'info') {
+            syncStatus.textContent = message;
+            syncStatus.className = `sync-status ${type}`;
+            syncStatus.style.display = 'block';
+        }
+        
+        // 检查Supabase连接
+        async function checkSupabaseConnection() {
+            try {
+                const { data, error } = await supabase
+                    .from('class_data')
+                    .select('id')
+                    .limit(1);
+                
+                if (error) throw error;
+                isOnline = true;
+                showSyncStatus('✅ 已连接到云端存储，数据实时同步', 'success');
+                return true;
+            } catch (error) {
+                console.log('Supabase连接失败:', error);
+                isOnline = false;
+                showSyncStatus('❌ 离线模式 - 使用本地数据', 'error');
+                return false;
+            }
+        }
+        
+        // 从Supabase加载数据
+        async function loadDataFromSupabase() {
+            try {
+                const { data, error } = await supabase
+                    .from('class_data')
+                    .select('data')
+                    .eq('id', 1)
+                    .single();
+                
+                if (error) throw error;
+                
+                if (data && data.data) {
+                    classes = data.data;
+                    saveDataToLocal();
+                    showSyncStatus('✅ 数据已从云端加载', 'success');
+                    return true;
+                } else {
+                    // 如果没有数据，创建初始数据
+                    await createInitialData();
+                    return true;
+                }
+            } catch (error) {
+                console.log('从Supabase加载数据失败:', error);
+                return false;
+            }
+        }
+        
+        // 创建初始数据
+        async function createInitialData() {
+            try {
+                const { error } = await supabase
+                    .from('class_data')
+                    .insert({
+                        id: 1,
+                        data: [],
+                        updated_at: new Date().toISOString()
+                    });
+                
+                if (error) throw error;
+                console.log('初始数据创建成功');
+                return true;
+            } catch (error) {
+                console.log('创建初始数据失败:', error);
+                return false;
+            }
+        }
+        
+        // 保存数据到Supabase
+        async function saveDataToSupabase() {
+            if (!isOnline) return false;
+            
+            try {
+                const { error } = await supabase
+                    .from('class_data')
+                    .upsert({
+                        id: 1,
+                        data: classes,
+                        updated_at: new Date().toISOString()
+                    });
+                
+                if (error) throw error;
+                
+                showSyncStatus('✅ 数据已同步到云端', 'success');
+                return true;
+            } catch (error) {
+                console.log('保存到Supabase失败:', error);
+                showSyncStatus('❌ 云端同步失败', 'error');
+                return false;
+            }
+        }
+        
+        // 保存数据到本地存储
+        function saveDataToLocal() {
+            try {
+                localStorage.setItem('classes', JSON.stringify(classes));
+                localStorage.setItem('lastSaveTime', Date.now().toString());
+            } catch (error) {
+                console.error('本地保存失败:', error);
+            }
+        }
+        
+        // 从本地存储加载数据
+        function loadDataFromLocal() {
+            try {
+                const localData = localStorage.getItem('classes');
+                if (localData) {
+                    classes = JSON.parse(localData);
+                    return true;
+                }
+            } catch (error) {
+                console.error('从本地存储加载数据失败:', error);
+            }
+            classes = [];
+            return false;
+        }
+        
+        // 保存数据（同时保存到本地和云端）
+        async function saveData() {
+            // 先保存到本地
+            saveDataToLocal();
+            
+            // 尝试保存到云端
+            if (isOnline) {
+                await saveDataToSupabase();
+            }
+        }
+        
+        // 导出数据
+        function exportData() {
+            try {
+                const dataStr = JSON.stringify(classes, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `class-data-backup-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showSyncStatus('✅ 数据已导出为备份文件', 'success');
+            } catch (error) {
+                console.error('导出数据失败:', error);
+                showSyncStatus('❌ 导出失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 导入数据
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                showSyncStatus('❌ 未选择文件', 'error');
+                return;
+            }
+            
+            if (!file.name.endsWith('.json')) {
+                showSyncStatus('❌ 请选择JSON文件', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    if (!Array.isArray(importedData)) {
+                        throw new Error('数据格式错误：应为数组');
+                    }
+                    
+                    for (let i = 0; i < importedData.length; i++) {
+                        const cls = importedData[i];
+                        if (!cls.name || !Array.isArray(cls.students)) {
+                            throw new Error(`第${i + 1}个班级数据格式错误`);
+                        }
+                    }
+                    
+                    if (confirm(`确定要导入数据吗？这将覆盖当前的所有数据。\n包含 ${importedData.length} 个班级`)) {
+                        classes = importedData;
+                        await saveData();
+                        updateUI();
+                        showSyncStatus(`✅ 数据导入成功！共 ${importedData.length} 个班级`, 'success');
+                    }
+                } catch (error) {
+                    console.error('导入数据失败:', error);
+                    showSyncStatus('❌ 导入失败: ' + error.message, 'error');
+                }
+            };
+            
+            reader.onerror = function() {
+                showSyncStatus('❌ 文件读取失败', 'error');
+            };
+            
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+        
+        // 更新所有UI组件
+        function updateUI() {
+            renderClassList();
+            updateClassSelects();
+            updateStats();
+            renderStudentList();
+        }
+        
+        // 初始化页面
+        async function initPage() {
+            // 检查Supabase连接
+            await checkSupabaseConnection();
+            
+            // 尝试从云端加载数据
+            const cloudSuccess = await loadDataFromSupabase();
+            
+            // 如果云端加载失败，使用本地数据
+            if (!cloudSuccess) {
+                const localSuccess = loadDataFromLocal();
+                if (localSuccess) {
+                    showSyncStatus('ℹ️ 使用本地数据', 'info');
+                } else {
+                    showSyncStatus('ℹ️ 使用空数据', 'info');
+                }
+            }
+            
+            updateUI();
+            setupEventListeners();
+        }
+        
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 数据管理事件
+            exportBtn.addEventListener('click', exportData);
+            importFile.addEventListener('change', importData);
+            syncToCloud.addEventListener('click', async () => {
+                if (await saveDataToSupabase()) {
+                    showSyncStatus('✅ 手动同步成功', 'success');
+                }
+            });
+            
+            // 其他事件监听器
+            addClassBtn.addEventListener('click', addClass);
+            addStudentBtn.addEventListener('click', addStudent);
+            classSelect.addEventListener('change', renderStudentList);
+            randomBtn.addEventListener('click', randomSelect);
+            
+            // 页面导航
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const pageId = this.getAttribute('data-page');
+                    
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    pages.forEach(page => page.classList.remove('active'));
+                    document.getElementById(`${pageId}-page`).classList.add('active');
+                });
+            });
+            
+            // 语音控制
+            voiceToggle.addEventListener('click', function() {
+                voiceEnabled = !voiceEnabled;
+                voiceStatus.textContent = voiceEnabled ? '开启' : '关闭';
+                voiceToggle.classList.toggle('active', voiceEnabled);
+            });
+            
+            // 初始化语音控制状态
+            voiceToggle.classList.add('active');
+        }
+        
+        // 更新统计信息
+        function updateStats() {
+            classCount.textContent = classes.length;
+            
+            let totalStudents = 0;
+            classes.forEach(cls => {
+                totalStudents += cls.students.length;
+            });
+            studentCount.textContent = totalStudents;
+        }
+        
+        // 渲染班级列表
+        function renderClassList() {
+            classList.innerHTML = '';
+            
+            if (classes.length === 0) {
+                classList.innerHTML = '<div class="empty-message">暂无班级，请添加班级</div>';
+                return;
+            }
+            
+            classes.forEach((cls, index) => {
+                const classItem = document.createElement('div');
+                classItem.className = 'list-item';
+                classItem.innerHTML = `
+                    <div>
+                        <div class="item-name">${cls.name}</div>
+                        <div style="color: rgba(255,255,255,0.6); font-size: 0.9rem; margin-top: 5px;">
+                            学生数量: ${cls.students.length}
+                        </div>
+                    </div>
+                    <div class="item-actions">
+                        <button class="btn btn-secondary btn-sm" onclick="editClass(${index})">编辑</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteClass(${index})">删除</button>
+                    </div>
+                `;
+                classList.appendChild(classItem);
+            });
+        }
+        
+        // 更新班级选择下拉框
+        function updateClassSelects() {
+            classSelect.innerHTML = '<option value="">-- 请选择班级 --</option>';
+            randomClassSelect.innerHTML = '<option value="">-- 请选择班级 --</option>';
+            
+            classes.forEach((cls, index) => {
+                const option1 = document.createElement('option');
+                option1.value = index;
+                option1.textContent = cls.name;
+                classSelect.appendChild(option1);
+                
+                const option2 = document.createElement('option');
+                option2.value = index;
+                option2.textContent = cls.name;
+                randomClassSelect.appendChild(option2);
+            });
+        }
+        
+        // 添加班级
+        async function addClass() {
+            const className = classNameInput.value.trim();
+            
+            if (!className) {
+                alert('请输入班级名称');
+                return;
+            }
+            
+            classes.push({
+                name: className,
+                students: []
+            });
+            
+            await saveData();
+            classNameInput.value = '';
+            updateUI();
+        }
+        
+        // 编辑班级
+        async function editClass(index) {
+            const newName = prompt('请输入新的班级名称', classes[index].name);
+            
+            if (newName && newName.trim()) {
+                classes[index].name = newName.trim();
+                await saveData();
+                updateUI();
+            }
+        }
+        
+        // 删除班级
+        async function deleteClass(index) {
+            if (confirm(`确定要删除班级 "${classes[index].name}" 吗？`)) {
+                classes.splice(index, 1);
+                await saveData();
+                updateUI();
+            }
+        }
+        
+        // 渲染学生列表
+        function renderStudentList() {
+            studentList.innerHTML = '';
+            
+            const selectedClassIndex = classSelect.value;
+            
+            if (selectedClassIndex === '') {
+                studentList.innerHTML = '<div class="empty-message">请选择班级查看学生</div>';
+                return;
+            }
+            
+            const students = classes[selectedClassIndex].students;
+            
+            if (students.length === 0) {
+                studentList.innerHTML = '<div class="empty-message">该班级暂无学生</div>';
+                return;
+            }
+            
+            students.forEach((student, index) => {
+                const studentItem = document.createElement('div');
+                studentItem.className = 'list-item';
+                studentItem.innerHTML = `
+                    <div class="item-name">${student}</div>
+                    <div class="item-actions">
+                        <button class="btn btn-danger btn-sm" onclick="deleteStudent(${selectedClassIndex}, ${index})">删除</button>
+                    </div>
+                `;
+                studentList.appendChild(studentItem);
+            });
+        }
+        
+        // 添加学生
+        async function addStudent() {
+            const selectedClassIndex = classSelect.value;
+            const studentName = studentNameInput.value.trim();
+            
+            if (selectedClassIndex === '') {
+                alert('请先选择班级');
+                return;
+            }
+            
+            if (!studentName) {
+                alert('请输入学生姓名');
+                return;
+            }
+            
+            classes[selectedClassIndex].students.push(studentName);
+            await saveData();
+            studentNameInput.value = '';
+            updateUI();
+        }
+        
+        // 删除学生
+        async function deleteStudent(classIndex, studentIndex) {
+            if (confirm(`确定要删除学生 "${classes[classIndex].students[studentIndex]}" 吗？`)) {
+                classes[classIndex].students.splice(studentIndex, 1);
+                await saveData();
+                updateUI();
+            }
+        }
+        
+        // 语音播报
+        function speakText(text) {
+            if (!voiceEnabled) return;
+            
+            if (!('speechSynthesis' in window)) {
+                console.log('抱歉，您的浏览器不支持语音合成功能');
+                return;
+            }
+            
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'zh-CN';
+            utterance.rate = 0.8;
+            utterance.pitch = 0.9;
+            utterance.volume = 1;
+            
+            window.speechSynthesis.speak(utterance);
+        }
+        
+        // 随机点名
+        function randomSelect() {
+            const selectedClassIndex = randomClassSelect.value;
+            
+            if (selectedClassIndex === '') {
+                alert('请先选择班级');
+                return;
+            }
+            
+            const students = classes[selectedClassIndex].students;
+            
+            if (students.length === 0) {
+                alert('该班级没有学生，无法点名');
+                return;
+            }
+            
+            studentDisplay.classList.add('pulse');
+            
+            let counter = 0;
+            const interval = setInterval(() => {
+                const randomIndex = Math.floor(Math.random() * students.length);
+                studentDisplay.textContent = students[randomIndex];
+                counter++;
+                
+                if (counter > 15) {
+                    clearInterval(interval);
+                    studentDisplay.classList.remove('pulse');
+                    
+                    const finalIndex = Math.floor(Math.random() * students.length);
+                    const selectedStudent = students[finalIndex];
+                    studentDisplay.textContent = selectedStudent;
+                    
+                    speakText(selectedStudent);
+                    
+                    studentDisplay.style.background = 'rgba(0, 255, 157, 0.1)';
+                    studentDisplay.style.borderColor = 'var(--accent)';
+                    setTimeout(() => {
+                        studentDisplay.style.background = 'rgba(5, 10, 20, 0.6)';
+                        studentDisplay.style.borderColor = 'rgba(0, 243, 255, 0.3)';
+                    }, 2000);
+                }
+            }, 100);
+        }
+        
+        // 事件监听
+        addClassBtn.addEventListener('click', addClass);
+        addStudentBtn.addEventListener('click', addStudent);
+        classSelect.addEventListener('change', renderStudentList);
+        randomBtn.addEventListener('click', randomSelect);
+        
+        // 初始化页面
+        initPage();
+        
+        // 全局函数，供HTML中的onclick调用
+        window.editClass = editClass;
+        window.deleteClass = deleteClass;
+        window.deleteStudent = deleteStudent;
+    </script>
+</body>
+</html>
