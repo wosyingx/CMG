@@ -440,6 +440,27 @@
             color: rgba(255, 255, 255, 0.7);
             margin-bottom: 10px;
         }
+
+        /* 导入选项 */
+        .import-options {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 243, 255, 0.05);
+            border-radius: 8px;
+            border: 1px dashed rgba(0, 243, 255, 0.3);
+        }
+
+        .import-options label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+
+        .import-options input[type="radio"] {
+            width: auto;
+        }
         
         /* 响应式设计 */
         @media (max-width: 768px) {
@@ -541,6 +562,18 @@
                         <button id="syncToCloud" class="btn btn-secondary">
                             <i>☁️</i> 手动同步
                         </button>
+                    </div>
+                    
+                    <div class="import-options">
+                        <h4>📋 导入选项</h4>
+                        <label>
+                            <input type="radio" name="importMode" value="replace" checked>
+                            替换现有数据（删除所有现有班级）
+                        </label>
+                        <label>
+                            <input type="radio" name="importMode" value="merge">
+                            合并数据（保留现有班级，只添加新班级）
+                        </label>
                     </div>
                     
                     <div class="template-download">
@@ -652,7 +685,8 @@
         let classes = [];
         let voiceEnabled = true;
         let isOnline = false;
-        
+        let currentSelectedClassIndex = -1; // 保存当前选中的班级索引
+
         // DOM元素
         const classNameInput = document.getElementById('className');
         const addClassBtn = document.getElementById('addClassBtn');
@@ -920,11 +954,53 @@
                         throw new Error('未找到有效的班级数据');
                     }
                     
-                    if (confirm(`确定要导入数据吗？这将覆盖当前的所有数据。\n找到 ${importedClasses.length} 个班级，共 ${importedClasses.reduce((sum, cls) => sum + cls.students.length, 0)} 名学生`)) {
-                        classes = importedClasses;
-                        await saveData();
-                        updateUI();
-                        showSyncStatus(`✅ Excel导入成功！共 ${importedClasses.length} 个班级`, 'success');
+                    // 获取导入模式
+                    const importMode = document.querySelector('input[name="importMode"]:checked').value;
+                    
+                    if (importMode === 'replace') {
+                        // 替换模式
+                        if (confirm(`确定要替换所有数据吗？这将删除现有的 ${classes.length} 个班级，并导入 ${importedClasses.length} 个新班级`)) {
+                            classes = importedClasses;
+                            await saveData();
+                            updateUI();
+                            showSyncStatus(`✅ Excel导入成功！共 ${importedClasses.length} 个班级`, 'success');
+                        }
+                    } else {
+                        // 合并模式
+                        const existingClassNames = classes.map(cls => cls.name);
+                        const newClasses = importedClasses.filter(cls => !existingClassNames.includes(cls.name));
+                        const updatedClasses = importedClasses.filter(cls => existingClassNames.includes(cls.name));
+                        
+                        if (newClasses.length === 0 && updatedClasses.length === 0) {
+                            showSyncStatus('ℹ️ 没有新的班级数据需要导入', 'info');
+                            return;
+                        }
+                        
+                        let message = `确定要合并数据吗？\n`;
+                        if (newClasses.length > 0) {
+                            message += `将添加 ${newClasses.length} 个新班级\n`;
+                        }
+                        if (updatedClasses.length > 0) {
+                            message += `将更新 ${updatedClasses.length} 个现有班级的学生名单\n`;
+                        }
+                        message += `现有 ${classes.length} 个班级将被保留`;
+                        
+                        if (confirm(message)) {
+                            // 添加新班级
+                            classes.push(...newClasses);
+                            
+                            // 更新现有班级的学生名单
+                            updatedClasses.forEach(updatedClass => {
+                                const existingIndex = classes.findIndex(cls => cls.name === updatedClass.name);
+                                if (existingIndex !== -1) {
+                                    classes[existingIndex].students = [...new Set([...classes[existingIndex].students, ...updatedClass.students])];
+                                }
+                            });
+                            
+                            await saveData();
+                            updateUI();
+                            showSyncStatus(`✅ Excel合并成功！添加了 ${newClasses.length} 个新班级，更新了 ${updatedClasses.length} 个现有班级`, 'success');
+                        }
                     }
                 } catch (error) {
                     console.error('导入Excel失败:', error);
@@ -996,7 +1072,10 @@
             renderClassList();
             updateClassSelects();
             updateStats();
-            renderStudentList();
+            // 只在学生管理页面更新学生列表
+            if (document.getElementById('students-page').classList.contains('active')) {
+                renderStudentList();
+            }
         }
         
         // 初始化页面
@@ -1036,7 +1115,13 @@
             // 其他事件监听器
             addClassBtn.addEventListener('click', addClass);
             addStudentBtn.addEventListener('click', addStudent);
-            classSelect.addEventListener('change', renderStudentList);
+            
+            // 修复：保存选中的班级，避免重新选择
+            classSelect.addEventListener('change', function() {
+                currentSelectedClassIndex = this.value;
+                renderStudentList();
+            });
+            
             randomBtn.addEventListener('click', randomSelect);
             
             // 页面导航
@@ -1050,6 +1135,12 @@
                     
                     pages.forEach(page => page.classList.remove('active'));
                     document.getElementById(`${pageId}-page`).classList.add('active');
+                    
+                    // 切换到学生管理页面时，恢复之前选中的班级
+                    if (pageId === 'students' && currentSelectedClassIndex !== -1) {
+                        classSelect.value = currentSelectedClassIndex;
+                        renderStudentList();
+                    }
                 });
             });
             
@@ -1119,6 +1210,11 @@
                 option2.textContent = cls.name;
                 randomClassSelect.appendChild(option2);
             });
+            
+            // 恢复之前选中的班级
+            if (currentSelectedClassIndex !== -1 && currentSelectedClassIndex < classes.length) {
+                classSelect.value = currentSelectedClassIndex;
+            }
         }
         
         // 添加班级
@@ -1155,6 +1251,11 @@
         async function deleteClass(index) {
             if (confirm(`确定要删除班级 "${classes[index].name}" 吗？`)) {
                 classes.splice(index, 1);
+                // 如果删除的是当前选中的班级，重置选中状态
+                if (currentSelectedClassIndex === index.toString()) {
+                    currentSelectedClassIndex = -1;
+                    classSelect.value = '';
+                }
                 await saveData();
                 updateUI();
             }
@@ -1209,7 +1310,9 @@
             classes[selectedClassIndex].students.push(studentName);
             await saveData();
             studentNameInput.value = '';
-            updateUI();
+            // 只更新学生列表，不重置班级选择
+            renderStudentList();
+            updateStats(); // 更新统计信息
         }
         
         // 删除学生
@@ -1217,7 +1320,9 @@
             if (confirm(`确定要删除学生 "${classes[classIndex].students[studentIndex]}" 吗？`)) {
                 classes[classIndex].students.splice(studentIndex, 1);
                 await saveData();
-                updateUI();
+                // 只更新学生列表，不重置班级选择
+                renderStudentList();
+                updateStats(); // 更新统计信息
             }
         }
         
@@ -1286,7 +1391,6 @@
         // 事件监听
         addClassBtn.addEventListener('click', addClass);
         addStudentBtn.addEventListener('click', addStudent);
-        classSelect.addEventListener('change', renderStudentList);
         randomBtn.addEventListener('click', randomSelect);
         
         // 初始化页面
